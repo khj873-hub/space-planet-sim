@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌌 COSMOS HAND — 3D 우주 행성 조작</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+
+  :root {
+    --neon-cyan: #00f5ff;
+    --neon-purple: #bf00ff;
+    --neon-orange: #ff6b00;
+    --deep-space: #000008;
+    --panel-bg: rgba(0, 10, 30, 0.85);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--deep-space);
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--neon-cyan);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  #canvas-container {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 1;
+  }
+
+  #webcam-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 100;
+    border: 1px solid rgba(0,245,255,0.4);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 0 20px rgba(0,245,255,0.2), inset 0 0 20px rgba(0,0,0,0.5);
+  }
+
+  #webcam { 
+    width: 220px; 
+    height: 165px; 
+    display: block;
+    opacity: 0.9;
+  }
+
+  #landmark-canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 220px;
+    height: 165px;
+  }
+
+  .webcam-label {
+    position: absolute;
+    top: 6px; left: 8px;
+    font-size: 9px;
+    color: var(--neon-cyan);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    opacity: 0.8;
+  }
+
+  /* HUD UI */
+  #hud {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 50;
+    pointer-events: none;
+  }
+
+  .hud-corner {
+    position: absolute;
+    width: 80px; height: 80px;
+    opacity: 0.5;
+  }
+  .hud-corner.tl { top: 0; left: 0; border-top: 2px solid var(--neon-cyan); border-left: 2px solid var(--neon-cyan); }
+  .hud-corner.tr { top: 0; right: 0; border-top: 2px solid var(--neon-cyan); border-right: 2px solid var(--neon-cyan); }
+  .hud-corner.bl { bottom: 0; left: 0; border-bottom: 2px solid var(--neon-cyan); border-left: 2px solid var(--neon-cyan); }
+  .hud-corner.br { bottom: 0; right: 0; border-bottom: 2px solid var(--neon-cyan); border-right: 2px solid var(--neon-cyan); }
+
+  #title-area {
+    position: absolute;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+  }
+
+  #title-area h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 18px;
+    font-weight: 900;
+    letter-spacing: 6px;
+    color: var(--neon-cyan);
+    text-shadow: 0 0 20px var(--neon-cyan), 0 0 40px rgba(0,245,255,0.3);
+    text-transform: uppercase;
+  }
+
+  #title-area .subtitle {
+    font-size: 9px;
+    letter-spacing: 4px;
+    color: rgba(0,245,255,0.5);
+    margin-top: 4px;
+  }
+
+  #status-panel {
+    position: absolute;
+    top: 24px;
+    left: 24px;
+    font-size: 10px;
+    letter-spacing: 1px;
+    line-height: 2;
+  }
+
+  .status-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 2px;
+  }
+
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #333;
+    flex-shrink: 0;
+    transition: background 0.3s;
+  }
+  .status-dot.active { background: var(--neon-cyan); box-shadow: 0 0 8px var(--neon-cyan); }
+  .status-dot.warn { background: var(--neon-orange); box-shadow: 0 0 8px var(--neon-orange); }
+
+  #gesture-panel {
+    position: absolute;
+    top: 24px;
+    right: 260px;
+    text-align: right;
+    font-size: 10px;
+    letter-spacing: 1px;
+    line-height: 2;
+  }
+
+  .gesture-name {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 13px;
+    color: var(--neon-purple);
+    text-shadow: 0 0 10px var(--neon-purple);
+    min-height: 20px;
+  }
+
+  #info-panel {
+    position: absolute;
+    bottom: 24px;
+    left: 24px;
+    font-size: 9px;
+    letter-spacing: 1px;
+    line-height: 2;
+    color: rgba(0,245,255,0.5);
+  }
+
+  #planet-info {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    font-family: 'Orbitron', sans-serif;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s, transform 0.3s;
+    z-index: 150;
+  }
+  #planet-info.visible {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  #planet-info .planet-icon {
+    font-size: 48px;
+    margin-bottom: 8px;
+    display: block;
+    filter: drop-shadow(0 0 12px rgba(0,245,255,0.8));
+  }
+  #planet-info .planet-name {
+    font-size: 36px;
+    font-weight: 900;
+    letter-spacing: 8px;
+    color: #fff;
+    text-shadow:
+      0 0 20px var(--neon-cyan),
+      0 0 40px var(--neon-cyan),
+      0 0 80px rgba(0,245,255,0.4);
+    margin-bottom: 10px;
+  }
+  #planet-info .planet-detail {
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: rgba(0,245,255,0.7);
+    text-shadow: 0 0 8px rgba(0,245,255,0.5);
+  }
+  #planet-info .planet-bar {
+    width: 120px;
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--neon-cyan), transparent);
+    margin: 10px auto;
+  }
+
+  /* Scanline effect */
+  #scanlines {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 200;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.03) 2px,
+      rgba(0,0,0,0.03) 4px
+    );
+  }
+
+  /* Loading overlay */
+  #loading {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 9999;
+    background: var(--deep-space);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+  }
+
+  #loading h2 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 24px;
+    letter-spacing: 8px;
+    color: var(--neon-cyan);
+    text-shadow: 0 0 30px var(--neon-cyan);
+  }
+
+  #loading-bar-wrap {
+    width: 300px;
+    height: 2px;
+    background: rgba(0,245,255,0.1);
+    position: relative;
+    overflow: hidden;
+  }
+
+  #loading-bar {
+    height: 100%;
+    background: var(--neon-cyan);
+    box-shadow: 0 0 10px var(--neon-cyan);
+    width: 0%;
+    transition: width 0.3s;
+  }
+
+  #loading-text {
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: rgba(0,245,255,0.5);
+  }
+
+  /* Crosshair */
+  #crosshair {
+    position: fixed;
+    z-index: 60;
+    width: 50px; height: 50px;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  #crosshair::before, #crosshair::after {
+    content: '';
+    position: absolute;
+    background: #fff;
+    box-shadow:
+      0 0 6px var(--neon-cyan),
+      0 0 14px var(--neon-cyan),
+      0 0 28px rgba(0,245,255,0.6);
+  }
+  #crosshair::before { left: 50%; top: 0; width: 2px; height: 100%; transform: translateX(-50%); }
+  #crosshair::after  { top: 50%; left: 0; height: 2px; width: 100%; transform: translateY(-50%); }
+
+  /* 크로스헤어 중심 원 */
+  #crosshair-dot {
+    position: fixed;
+    z-index: 61;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 8px var(--neon-cyan), 0 0 20px var(--neon-cyan);
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <h2>COSMOS HAND</h2>
+  <div id="loading-bar-wrap"><div id="loading-bar"></div></div>
+  <div id="loading-text">INITIALIZING DEEP SPACE ENGINE...</div>
+</div>
+
+<div id="canvas-container"></div>
+<div id="crosshair"></div>
+<div id="crosshair-dot"></div>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="hud-corner tl"></div>
+  <div class="hud-corner tr"></div>
+  <div class="hud-corner bl"></div>
+  <div class="hud-corner br"></div>
+
+  <div id="title-area">
+    <h1>🌌 COSMOS HAND</h1>
+    <div class="subtitle">HAND-CONTROLLED PLANETARY SIMULATION</div>
+  </div>
+
+  <div id="status-panel">
+    <div class="status-row"><div class="status-dot" id="dot-cam"></div><span id="txt-cam">CAMERA OFFLINE</span></div>
+    <div class="status-row"><div class="status-dot" id="dot-hand"></div><span id="txt-hand">HAND TRACKING OFFLINE</span></div>
+    <div class="status-row"><div class="status-dot" id="dot-ai"></div><span>MEDIAPIPE AI LOADED</span></div>
+    <div class="status-row"><div class="status-dot active" id="dot-3d"></div><span>THREE.JS RENDERER ACTIVE</span></div>
+  </div>
+
+  <div id="gesture-panel">
+    <div style="color:rgba(0,245,255,0.4); margin-bottom:4px;">GESTURE DETECTED</div>
+    <div class="gesture-name" id="gesture-display">—</div>
+    <div style="margin-top:8px; color:rgba(0,245,255,0.4);">PINCH DIST</div>
+    <div id="pinch-display" style="color:var(--neon-orange);">—</div>
+  </div>
+
+  <div id="info-panel">
+    <div>✋ OPEN HAND → ROTATE PLANET</div>
+    <div>🤌 PINCH → ZOOM IN/OUT (단일손)</div>
+    <div>🙌 TWO HANDS → ZOOM IN/OUT (양손)</div>
+    <div>☝️ POINT (1 FINGER) → SELECT PLANET</div>
+    <div>✊ FIST → PAUSE ROTATION</div>
+    <div>🖐 SPREAD → EXPLODE EFFECT</div>
+  </div>
+
+  <div id="planet-info">
+    <div class="planet-icon" id="planet-icon-display">🌌</div>
+    <div class="planet-name" id="planet-name-display">SOLAR SYSTEM</div>
+    <div class="planet-bar"></div>
+    <div class="planet-detail" id="planet-detail-display">HOVER TO EXPLORE</div>
+  </div>
+</div>
+
+<!-- Webcam -->
+<div id="webcam-container">
+  <video id="webcam" autoplay playsinline muted></video>
+  <canvas id="landmark-canvas" width="220" height="165"></canvas>
+  <div class="webcam-label">HAND CAM</div>
+</div>
+
+<div id="scanlines"></div>
+
+<!-- THREE.JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<!-- MediaPipe Hands -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+<script>
+// =============================================
+// LOADING PROGRESS
+// =============================================
+function setLoading(pct, msg) {
+  document.getElementById('loading-bar').style.width = pct + '%';
+  document.getElementById('loading-text').textContent = msg;
+}
+
+// =============================================
+// THREE.JS SCENE SETUP
+// =============================================
+setLoading(10, 'BUILDING 3D UNIVERSE...');
+
+const container = document.getElementById('canvas-container');
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 5000);
+camera.position.set(0, 30, 120);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+container.appendChild(renderer.domElement);
+
+// SCENE BACKGROUND
+scene.background = new THREE.Color(0x000008);
+scene.fog = new THREE.Fog(0x000008, 300, 1000);
+
+// =============================================
+// STARS
+// =============================================
+function createStarField(count, spread) {
+  const geo = new THREE.BufferGeometry();
+  const positions = new Float32Array(count * 3);
+  const colors = new Float32Array(count * 3);
+  const sizes = new Float32Array(count);
+
+  for (let i = 0; i < count; i++) {
+    positions[i*3]   = (Math.random() - 0.5) * spread;
+    positions[i*3+1] = (Math.random() - 0.5) * spread;
+    positions[i*3+2] = (Math.random() - 0.5) * spread;
+
+    const r = Math.random();
+    if (r < 0.6) { colors[i*3]=0.8; colors[i*3+1]=0.9; colors[i*3+2]=1.0; }
+    else if (r < 0.8) { colors[i*3]=1.0; colors[i*3+1]=0.9; colors[i*3+2]=0.7; }
+    else { colors[i*3]=1.0; colors[i*3+1]=0.5; colors[i*3+2]=0.5; }
+
+    sizes[i] = Math.random() * 2 + 0.3;
+  }
+
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+  const mat = new THREE.PointsMaterial({
+    size: 0.8,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.85,
+    sizeAttenuation: true
+  });
+
+  return new THREE.Points(geo, mat);
+}
+
+const stars1 = createStarField(5000, 2000);
+const stars2 = createStarField(2000, 800);
+scene.add(stars1);
+scene.add(stars2);
+
+// =============================================
+// LIGHTING
+// =============================================
+const sunLight = new THREE.PointLight(0xffffff, 4, 1000);
+sunLight.position.set(0, 0, 0);
+sunLight.castShadow = true;
+scene.add(sunLight);
+
+// 전체 밝기 대폭 향상
+const ambientLight = new THREE.AmbientLight(0x334466, 1.8);
+scene.add(ambientLight);
+
+// 측면 보조광 — 그림자 면도 살짝 보이게
+const fillLight1 = new THREE.DirectionalLight(0x6699ff, 0.8);
+fillLight1.position.set(200, 100, 100);
+scene.add(fillLight1);
+
+const fillLight2 = new THREE.DirectionalLight(0x4466aa, 0.5);
+fillLight2.position.set(-200, -50, -100);
+scene.add(fillLight2);
+
+const rimLight = new THREE.DirectionalLight(0x88aaff, 0.4);
+rimLight.position.set(-100, 50, -100);
+scene.add(rimLight);
+
+// =============================================
+// PLANET DATA
+// =============================================
+const planetData = [
+  { name: 'SUN',     radius: 14, distance: 0,   color: 0xffaa00, emissive: 0xff6600, speed: 0,     detail: 'G-TYPE MAIN SEQUENCE STAR / TEMP: 5,778K' },
+  { name: 'MERCURY', radius: 1.8,distance: 28,  color: 0xaaaaaa, emissive: 0x555555, speed: 4.15,  detail: 'ROCKY PLANET / ORBITAL PERIOD: 88 DAYS' },
+  { name: 'VENUS',   radius: 2.8,distance: 40,  color: 0xf0c060, emissive: 0x886622, speed: 1.62,  detail: 'HELLISH TWIN / SURFACE TEMP: 464°C' },
+  { name: 'EARTH',   radius: 3.0,distance: 56,  color: 0x2288ff, emissive: 0x003388, speed: 1.0,   detail: 'PALE BLUE DOT / HOME WORLD' },
+  { name: 'MARS',    radius: 2.2,distance: 72,  color: 0xff4422, emissive: 0x881100, speed: 0.53,  detail: 'RED PLANET / OLYMPUS MONS: 22KM' },
+  { name: 'JUPITER', radius: 7.5,distance: 100, color: 0xddaa55, emissive: 0x664400, speed: 0.084, detail: 'GAS GIANT / 79 KNOWN MOONS' },
+  { name: 'SATURN',  radius: 6.0,distance: 130, color: 0xeecc88, emissive: 0x775500, speed: 0.034, ring: true, detail: 'LORD OF RINGS / DENSITY < WATER' },
+  { name: 'URANUS',  radius: 4.5,distance: 158, color: 0x55ddee, emissive: 0x006677, speed: 0.012, detail: 'ICE GIANT / ROTATES ON ITS SIDE' },
+  { name: 'NEPTUNE', radius: 4.0,distance: 182, color: 0x3366ff, emissive: 0x001177, speed: 0.006, detail: 'WINDY WORLD / SPEEDS: 2,100 KM/H' },
+];
+
+setLoading(30, 'GENERATING PLANETARY BODIES...');
+
+const planets = [];
+const orbitLines = [];
+const planetMeshes = [];
+
+// Texture generator via canvas
+function createPlanetTexture(baseColor, noiseAmt, stripeColor) {
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const r = (baseColor >> 16) & 0xff;
+  const g = (baseColor >> 8) & 0xff;
+  const b = baseColor & 0xff;
+
+  // Base gradient
+  const grad = ctx.createRadialGradient(size*0.4, size*0.3, 0, size/2, size/2, size/2);
+  grad.addColorStop(0, `rgba(${Math.min(r+60,255)},${Math.min(g+60,255)},${Math.min(b+60,255)},1)`);
+  grad.addColorStop(1, `rgba(${Math.max(r-40,0)},${Math.max(g-40,0)},${Math.max(b-40,0)},1)`);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+
+  // Noise / terrain
+  for (let i = 0; i < 800; i++) {
+    const x = Math.random() * size;
+    const y = Math.random() * size;
+    const s = Math.random() * noiseAmt * 20 + 2;
+    const a = Math.random() * 0.2;
+    ctx.fillStyle = `rgba(${Math.random()>0.5?255:0},${Math.random()>0.5?200:0},${Math.random()>0.5?100:0},${a})`;
+    ctx.beginPath();
+    ctx.ellipse(x, y, s, s*0.4, Math.random()*Math.PI, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  return new THREE.CanvasTexture(canvas);
+}
+
+// Sun glow
+function createSunGlow() {
+  const geo = new THREE.SphereGeometry(20, 32, 32);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xff8800,
+    transparent: true,
+    opacity: 0.12,
+    side: THREE.FrontSide
+  });
+  return new THREE.Mesh(geo, mat);
+}
+
+planetData.forEach((pd, i) => {
+  const group = new THREE.Group();
+  const tex = createPlanetTexture(pd.color, 0.5);
+  const geo = new THREE.SphereGeometry(pd.radius, 48, 48);
+  const mat = new THREE.MeshPhongMaterial({
+    map: tex,
+    emissive: new THREE.Color(pd.emissive),
+    emissiveIntensity: pd.name === 'SUN' ? 1.5 : 1.2,
+    shininess: pd.name === 'SUN' ? 0 : 60,
+  });
+  if (pd.name === 'SUN') {
+    mat.emissiveMap = tex;
+    mat.emissiveIntensity = 1.5;
+  }
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  group.add(mesh);
+  planetMeshes.push(mesh);
+
+  // Saturn rings
+  if (pd.ring) {
+    const ringGeo = new THREE.RingGeometry(pd.radius * 1.4, pd.radius * 2.3, 64);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0xd4b896,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.7
+    });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.rotation.x = Math.PI / 3;
+    group.add(ring);
+  }
+
+  // Sun glow effect
+  if (pd.name === 'SUN') {
+    group.add(createSunGlow());
+    const glow2 = createSunGlow();
+    glow2.scale.setScalar(1.3);
+    glow2.material.opacity = 0.05;
+    group.add(glow2);
+  }
+
+  // Orbit position
+  if (pd.distance > 0) {
+    const angle = Math.random() * Math.PI * 2;
+    group.position.set(Math.cos(angle) * pd.distance, 0, Math.sin(angle) * pd.distance);
+
+    // Orbit line
+    const orbitGeo = new THREE.BufferGeometry();
+    const pts = [];
+    for (let t = 0; t <= 64; t++) {
+      const a = (t / 64) * Math.PI * 2;
+      pts.push(new THREE.Vector3(Math.cos(a) * pd.distance, 0, Math.sin(a) * pd.distance));
+    }
+    orbitGeo.setFromPoints(pts);
+    const orbitMat = new THREE.LineBasicMaterial({ color: 0x224466, transparent: true, opacity: 0.3 });
+    const orbitLine = new THREE.Line(orbitGeo, orbitMat);
+    scene.add(orbitLine);
+    orbitLines.push(orbitLine);
+  }
+
+  scene.add(group);
+  planets.push({ group, mesh, data: pd, angle: Math.random() * Math.PI * 2, selfRotation: 0, selected: false, originalY: 0 });
+});
+
+setLoading(60, 'CALIBRATING HAND DETECTION AI...');
+
+// =============================================
+// HAND CONTROL STATE
+// =============================================
+const handState = {
+  detected: false,
+  landmarks: null,
+  gesture: 'NONE',
+  pinchDist: 0,
+  indexTip: null,
+  palmCenter: null,
+  prevPalmX: null,
+  prevPalmY: null,
+  fingerCount: 0,
+  // 양손 줌
+  hand2Detected: false,
+  palm2: null,
+  prevTwoHandDist: null,
+  twoHandZooming: false,
+};
+
+let cameraZoom = 120;
+let targetZoom = 120;
+let sceneRotationY = 0;
+let sceneRotationX = 0;
+let targetRotY = 0;
+let targetRotX = 0;
+let rotationPaused = false;
+let explodeActive = false;
+let explodeTimer = 0;
+let selectedPlanetIdx = -1;
+let prevPinchDist = 0;
+
+const solarSystem = new THREE.Group();
+planets.forEach(p => { scene.remove(p.group); solarSystem.add(p.group); });
+scene.add(solarSystem);
+
+// =============================================
+// GESTURE DETECTION
+// =============================================
+function detectFingers(lm) {
+  // Finger tips: 4(thumb), 8(index), 12(middle), 16(ring), 20(pinky)
+  // Finger PIPs: 3, 7, 11, 15, 19
+  const tips = [8, 12, 16, 20];
+  const pips = [6, 10, 14, 18];
+  let count = 0;
+  tips.forEach((tip, i) => {
+    if (lm[tip].y < lm[pips[i]].y) count++;
+  });
+  // Thumb
+  if (lm[4].x > lm[3].x) count++;
+  return count;
+}
+
+function getPinchDistance(lm) {
+  const dx = lm[4].x - lm[8].x;
+  const dy = lm[4].y - lm[8].y;
+  return Math.sqrt(dx*dx + dy*dy);
+}
+
+function classifyGesture(lm) {
+  const fingers = detectFingers(lm);
+  const pinch = getPinchDistance(lm);
+
+  handState.fingerCount = fingers;
+  handState.pinchDist = pinch;
+
+  if (pinch < 0.06) return 'PINCH';
+  if (fingers === 0) return 'FIST';
+  if (fingers === 1) return 'POINT';
+  if (fingers >= 4) return 'OPEN';
+  if (fingers === 5) return 'SPREAD';
+  return 'NEUTRAL';
+}
+
+function getPalmCenter(lm) {
+  return { x: lm[0].x, y: lm[0].y };
+}
+
+// =============================================
+// MEDIAPIPE HANDS SETUP
+// =============================================
+const videoElement = document.getElementById('webcam');
+const landmarkCanvas = document.getElementById('landmark-canvas');
+const lmCtx = landmarkCanvas.getContext('2d');
+
+const hands = new Hands({
+  locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+});
+
+hands.setOptions({
+  maxNumHands: 2,
+  modelComplexity: 1,
+  minDetectionConfidence: 0.7,
+  minTrackingConfidence: 0.6
+});
+
+hands.onResults((results) => {
+  // 실제 렌더된 비디오 크기에 맞게 캔버스 동기화
+  const vw = videoElement.clientWidth  || 220;
+  const vh = videoElement.clientHeight || 165;
+  if (landmarkCanvas.width !== vw || landmarkCanvas.height !== vh) {
+    landmarkCanvas.width  = vw;
+    landmarkCanvas.height = vh;
+  }
+  lmCtx.clearRect(0, 0, vw, vh);
+
+  const allHands = results.multiHandLandmarks || [];
+
+  if (allHands.length >= 1) {
+    const lm = allHands[0];
+    handState.detected = true;
+    handState.landmarks = lm;
+    handState.gesture = classifyGesture(lm);
+    handState.palmCenter = getPalmCenter(lm);
+    handState.indexTip = { x: lm[8].x, y: lm[8].y };
+    drawHandSkeleton(lm);
+    updateStatus('dot-hand', 'txt-hand', true, 'HAND TRACKED ✓');
+  } else {
+    handState.detected = false;
+    handState.gesture = 'NONE';
+    handState.prevTwoHandDist = null;
+    handState.twoHandZooming = false;
+    updateStatus('dot-hand', 'txt-hand', false, 'SEARCHING FOR HAND...');
+  }
+
+  // ── 양손 감지 → 두 손바닥 거리로 줌 ──────────────
+  if (allHands.length >= 2) {
+    const lm2 = allHands[1];
+    handState.hand2Detected = true;
+    handState.palm2 = { x: lm2[0].x, y: lm2[0].y };
+    handState.twoHandZooming = true;
+
+    // 두 손바닥 거리 계산
+    const p1 = handState.palmCenter;
+    const p2 = handState.palm2;
+    const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+
+    if (handState.prevTwoHandDist !== null) {
+      const delta = dist - handState.prevTwoHandDist;
+      targetZoom -= delta * 400; // 벌리면 줌아웃, 모으면 줌인
+      targetZoom = Math.max(40, Math.min(350, targetZoom));
+    }
+    handState.prevTwoHandDist = dist;
+
+    // 두 번째 손 스켈레톤 (오렌지색)
+    lmCtx.strokeStyle = 'rgba(255,107,0,0.6)';
+    lmCtx.lineWidth = 1.5;
+    const conn2 = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],
+      [0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],
+      [0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17]];
+    conn2.forEach(([a, b]) => {
+      lmCtx.beginPath();
+      lmCtx.moveTo(lm2[a].x*vw, lm2[a].y*vh);
+      lmCtx.lineTo(lm2[b].x*vw, lm2[b].y*vh);
+      lmCtx.stroke();
+    });
+    lm2.forEach((p, i) => {
+      lmCtx.beginPath();
+      lmCtx.arc(p.x*vw, p.y*vh, i===4||i===8 ? 5 : 3, 0, Math.PI*2);
+      lmCtx.fillStyle = '#ff6b00';
+      lmCtx.fill();
+    });
+
+    // 두 손 연결선
+    lmCtx.beginPath();
+    lmCtx.moveTo(p1.x*vw, p1.y*vh);
+    lmCtx.lineTo(p2.x*vw, p2.y*vh);
+    lmCtx.strokeStyle = 'rgba(255,215,0,0.5)';
+    lmCtx.lineWidth = 1;
+    lmCtx.setLineDash([4, 4]);
+    lmCtx.stroke();
+    lmCtx.setLineDash([]);
+
+  } else {
+    handState.hand2Detected = false;
+    handState.palm2 = null;
+    handState.prevTwoHandDist = null;
+    handState.twoHandZooming = false;
+  }
+
+  // Update gesture display
+  const gestureEl = document.getElementById('gesture-display');
+  if (handState.twoHandZooming) {
+    gestureEl.textContent = '🙌 TWO HAND ZOOM';
+  } else {
+    const gestures = { 'OPEN':'ROTATE MODE', 'PINCH':'ZOOM MODE', 'POINT':'SELECT MODE', 'FIST':'PAUSE MODE', 'SPREAD':'EXPLODE!', 'NONE':'—', 'NEUTRAL':'STANDBY' };
+    gestureEl.textContent = gestures[handState.gesture] || handState.gesture;
+  }
+
+  document.getElementById('pinch-display').textContent =
+    handState.detected ? (handState.pinchDist * 100).toFixed(1) + '%' : '—';
+});
+
+function drawHandSkeleton(lm) {
+  const w = landmarkCanvas.width;
+  const h = landmarkCanvas.height;
+  const connections = [
+    [0,1],[1,2],[2,3],[3,4],
+    [0,5],[5,6],[6,7],[7,8],
+    [0,9],[9,10],[10,11],[11,12],
+    [0,13],[13,14],[14,15],[15,16],
+    [0,17],[17,18],[18,19],[19,20],
+    [5,9],[9,13],[13,17]
+  ];
+
+  lmCtx.strokeStyle = 'rgba(0,245,255,0.6)';
+  lmCtx.lineWidth = 1.5;
+  connections.forEach(([a, b]) => {
+    const pa = lm[a], pb = lm[b];
+    lmCtx.beginPath();
+    lmCtx.moveTo(pa.x*w, pa.y*h);
+    lmCtx.lineTo(pb.x*w, pb.y*h);
+    lmCtx.stroke();
+  });
+
+  lm.forEach((p, i) => {
+    lmCtx.beginPath();
+    lmCtx.arc(p.x*w, p.y*h, i === 8 || i === 4 ? 5 : 3, 0, Math.PI*2);
+    lmCtx.fillStyle = i === 8 || i === 4 ? '#ff6b00' : '#00f5ff';
+    lmCtx.fill();
+  });
+}
+
+function updateStatus(dotId, txtId, active, text) {
+  const dot = document.getElementById(dotId);
+  const txt = document.getElementById(txtId);
+  dot.className = 'status-dot ' + (active ? 'active' : 'warn');
+  txt.textContent = text;
+}
+
+// =============================================
+// CAMERA SETUP
+// =============================================
+async function setupCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' } });
+    videoElement.srcObject = stream;
+    updateStatus('dot-cam', 'txt-cam', true, 'CAMERA ACTIVE ✓');
+    document.getElementById('dot-ai').className = 'status-dot active';
+
+    const mp_camera = new Camera(videoElement, {
+      onFrame: async () => {
+        await hands.send({ image: videoElement });
+      },
+      width: 640,
+      height: 480
+    });
+    mp_camera.start();
+  } catch(e) {
+    updateStatus('dot-cam', 'txt-cam', false, 'CAMERA DENIED — DEMO MODE');
+    console.warn('Camera error:', e);
+    demoMode();
+  }
+}
+
+// =============================================
+// DEMO MODE (no camera)
+// =============================================
+function demoMode() {
+  let demoT = 0;
+  setInterval(() => {
+    demoT += 0.02;
+    targetRotY += 0.005;
+    targetZoom = 120 + Math.sin(demoT * 0.3) * 20;
+  }, 16);
+}
+
+// =============================================
+// RAYCASTING FOR PLANET SELECTION
+// =============================================
+const raycaster = new THREE.Raycaster();
+const crosshair = document.getElementById('crosshair');
+
+// ── Web Audio 사운드 ─────────────────────────────
+let audioCtx = null;
+function initAudio(){
+  if(audioCtx) return;
+  audioCtx = new(window.AudioContext||window.webkitAudioContext)();
+}
+
+// 행성 호버 사운드 — 행성마다 다른 음정
+const PLANET_NOTES = {
+  'SUN':     880,  // 높고 웅장한 라
+  'MERCURY': 1047, // 가장 높은 도
+  'VENUS':   932,  // 시
+  'EARTH':   784,  // 솔
+  'MARS':    698,  // 파
+  'JUPITER': 523,  // 도
+  'SATURN':  466,  // 시♭
+  'URANUS':  392,  // 솔
+  'NEPTUNE': 330,  // 미
+};
+
+function playPlanetSound(planetName){
+  if(!audioCtx) return;
+  const freq = PLANET_NOTES[planetName] || 523;
+  const t = audioCtx.currentTime;
+
+  // 메인 톤 (사인파)
+  const o1 = audioCtx.createOscillator();
+  const g1 = audioCtx.createGain();
+  o1.type = 'sine';
+  o1.frequency.setValueAtTime(freq, t);
+  o1.frequency.setValueAtTime(freq * 1.5, t + 0.15); // 옥타브 상승
+  g1.gain.setValueAtTime(0, t);
+  g1.gain.linearRampToValueAtTime(0.22, t + 0.05);
+  g1.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+  o1.connect(g1); g1.connect(audioCtx.destination);
+  o1.start(t); o1.stop(t + 0.65);
+
+  // 하모닉 (5도 위)
+  const o2 = audioCtx.createOscillator();
+  const g2 = audioCtx.createGain();
+  o2.type = 'triangle';
+  o2.frequency.setValueAtTime(freq * 1.5, t);
+  g2.gain.setValueAtTime(0, t);
+  g2.gain.linearRampToValueAtTime(0.1, t + 0.05);
+  g2.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+  o2.connect(g2); g2.connect(audioCtx.destination);
+  o2.start(t); o2.stop(t + 0.55);
+
+  // 반짝임 노이즈 (별빛 느낌)
+  const bufSize = Math.floor(audioCtx.sampleRate * 0.12);
+  const buf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for(let i=0;i<bufSize;i++) data[i]=(Math.random()*2-1)*Math.exp(-i/(audioCtx.sampleRate*0.03));
+  const noise = audioCtx.createBufferSource();
+  noise.buffer = buf;
+  const f = audioCtx.createBiquadFilter();
+  f.type = 'highpass'; f.frequency.value = 3000;
+  const ng = audioCtx.createGain();
+  ng.gain.setValueAtTime(0.08, t);
+  ng.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+  noise.connect(f); f.connect(ng); ng.connect(audioCtx.destination);
+  noise.start(t);
+}
+
+const PLANET_ICONS = {
+  'SUN':'☀️','MERCURY':'⚫','VENUS':'🟡','EARTH':'🌍',
+  'MARS':'🔴','JUPITER':'🟠','SATURN':'🪐','URANUS':'🩵','NEPTUNE':'💙'
+};
+let planetHideTimer = null;
+let lastSelectedPlanet = null; // 동일 행성 연속 사운드 방지
+
+function checkPlanetHover(nx, ny) {
+  raycaster.setFromCamera(new THREE.Vector2(nx * 2 - 1, -(ny * 2 - 1)), camera);
+  const hits = raycaster.intersectObjects(planetMeshes);
+
+  const infoEl  = document.getElementById('planet-info');
+  const nameEl  = document.getElementById('planet-name-display');
+  const detailEl= document.getElementById('planet-detail-display');
+  const iconEl  = document.getElementById('planet-icon-display');
+
+  if (hits.length > 0) {
+    const hitMesh = hits[0].object;
+    const idx = planetMeshes.indexOf(hitMesh);
+    if (idx >= 0) {
+      const pd = planets[idx].data;
+      nameEl.textContent   = pd.name;
+      detailEl.textContent = pd.detail;
+      iconEl.textContent   = PLANET_ICONS[pd.name] || '🪐';
+      infoEl.classList.add('visible');
+
+      // 새 행성 선택 시에만 사운드 재생
+      if(lastSelectedPlanet !== pd.name){
+        initAudio();
+        playPlanetSound(pd.name);
+        lastSelectedPlanet = pd.name;
+      }
+
+      // 3초 후 자동 숨김
+      clearTimeout(planetHideTimer);
+      planetHideTimer = setTimeout(() => {
+        infoEl.classList.remove('visible');
+        lastSelectedPlanet = null;
+      }, 3000);
+      return idx;
+    }
+  }
+  return -1;
+}
+
+// =============================================
+// ANIMATE LOOP
+// =============================================
+const clock = new THREE.Clock();
+let time = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+  const delta = clock.getDelta();
+  time += delta;
+
+  // Apply hand gestures
+  if (handState.detected) {
+    const palm = handState.palmCenter;
+
+    // 양손 줌 중에는 단일 손 제스처 무시
+    if (!handState.twoHandZooming) {
+
+      if (handState.gesture === 'OPEN') {
+        // Rotate solar system
+        if (handState.prevPalmX !== null) {
+          const dx = palm.x - handState.prevPalmX;
+          const dy = palm.y - handState.prevPalmY;
+          targetRotY -= dx * 4;
+          targetRotX += dy * 2;
+          targetRotX = Math.max(-0.8, Math.min(0.8, targetRotX));
+        }
+        rotationPaused = false;
+      }
+
+      if (handState.gesture === 'PINCH') {
+        // 단일 손 핀치 줌
+        const pd = handState.pinchDist;
+        if (prevPinchDist > 0) {
+          const diff = pd - prevPinchDist;
+          targetZoom -= diff * 300;
+          targetZoom = Math.max(40, Math.min(250, targetZoom));
+        }
+        prevPinchDist = pd;
+      } else {
+        prevPinchDist = 0;
+      }
+
+      if (handState.gesture === 'FIST') {
+        rotationPaused = true;
+      }
+
+      if (handState.gesture === 'SPREAD' && !explodeActive) {
+        explodeActive = true;
+        explodeTimer = 0;
+      }
+
+      if (handState.gesture === 'POINT' && handState.indexTip) {
+        const tip = handState.indexTip;
+        const W = window.innerWidth;
+        const H = window.innerHeight;
+
+        // MediaPipe 좌표(0~1)를 화면 전체에 매핑
+        // 손이 화면 가장자리까지 안 잡히는 문제 → 여백 보정으로 스트레칭
+        const PAD_X = 0.1; // 좌우 10% 여백 보정
+        const PAD_Y = 0.1; // 상하 10% 여백 보정
+        const nx = Math.max(0, Math.min(1, (tip.x - PAD_X) / (1 - PAD_X * 2)));
+        const ny = Math.max(0, Math.min(1, (tip.y - PAD_Y) / (1 - PAD_Y * 2)));
+        const sx = nx * W;
+        const sy = ny * H;
+
+        crosshair.style.left = sx + 'px';
+        crosshair.style.top  = sy + 'px';
+        crosshair.style.opacity = '1';
+        document.getElementById('crosshair-dot').style.left    = sx + 'px';
+        document.getElementById('crosshair-dot').style.top     = sy + 'px';
+        document.getElementById('crosshair-dot').style.opacity = '1';
+        checkPlanetHover(nx, ny);
+      } else {
+        crosshair.style.opacity = '0';
+        document.getElementById('crosshair-dot').style.opacity = '0';
+      }
+
+    } else {
+      // 양손 줌 모드 — 크로스헤어 숨김
+      crosshair.style.opacity = '0';
+      prevPinchDist = 0;
+    }
+
+    handState.prevPalmX = palm.x;
+    handState.prevPalmY = palm.y;
+  } else {
+    handState.prevPalmX = null;
+    handState.prevPalmY = null;
+  }
+
+  // Smooth rotation & zoom
+  sceneRotationY += (targetRotY - sceneRotationY) * 0.08;
+  sceneRotationX += (targetRotX - sceneRotationX) * 0.08;
+  cameraZoom += (targetZoom - cameraZoom) * 0.06;
+
+  solarSystem.rotation.y = sceneRotationY;
+  solarSystem.rotation.x = sceneRotationX;
+  camera.position.z = cameraZoom;
+
+  // Planet orbits
+  planets.forEach((p, i) => {
+    if (p.data.distance === 0) {
+      // Sun: pulse
+      const pulse = 1 + Math.sin(time * 2) * 0.02;
+      p.group.scale.setScalar(pulse);
+      p.mesh.material.emissiveIntensity = 1.2 + Math.sin(time * 3) * 0.3;
+      return;
+    }
+
+    if (!rotationPaused) {
+      p.angle += p.data.speed * delta * 0.3;
+    }
+
+    const x = Math.cos(p.angle) * p.data.distance;
+    const z = Math.sin(p.angle) * p.data.distance;
+
+    // Explode effect
+    if (explodeActive) {
+      explodeTimer += delta;
+      const ex = Math.min(explodeTimer / 1.5, 1);
+      const ef = ex < 0.5 ? ex * 2 : (1 - ex) * 2;
+      const dir = new THREE.Vector3(x, 0, z).normalize();
+      p.group.position.set(
+        x + dir.x * ef * 60,
+        Math.sin(explodeTimer * 3 + i) * ef * 20,
+        z + dir.z * ef * 60
+      );
+      if (explodeTimer > 3) { explodeActive = false; }
+    } else {
+      p.group.position.set(x, 0, z);
+    }
+
+    // Self rotation
+    p.selfRotation += delta * (0.5 + i * 0.1);
+    p.mesh.rotation.y = p.selfRotation;
+  });
+
+  // Star field slow drift
+  stars1.rotation.y += delta * 0.005;
+  stars2.rotation.y -= delta * 0.003;
+
+  // Sun light flicker
+  sunLight.intensity = 2.5 + Math.sin(time * 7) * 0.2;
+
+  renderer.render(scene, camera);
+}
+
+// Resize
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// =============================================
+// INIT
+// =============================================
+setLoading(80, 'LAUNCHING SIMULATION...');
+animate();
+
+setTimeout(async () => {
+  setLoading(95, 'CONNECTING HAND SENSOR...');
+  await setupCamera();
+  setLoading(100, 'READY');
+  setTimeout(() => {
+    const loadEl = document.getElementById('loading');
+    loadEl.style.transition = 'opacity 0.8s';
+    loadEl.style.opacity = '0';
+    setTimeout(() => loadEl.style.display = 'none', 800);
+  }, 400);
+}, 600);
+</script>
+</body>
+</html>
